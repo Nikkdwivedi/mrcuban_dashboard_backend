@@ -18,6 +18,7 @@ const leadSchema = new mongoose.Schema(
       default: "pending",
     },
     drivers: [],
+    negotiation:[],
     otp: String,
     seater:Number,
   },

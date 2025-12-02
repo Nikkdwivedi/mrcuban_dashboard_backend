@@ -11,11 +11,13 @@ import {
   DisplayRides,
   FinishRide,
   StartRide,
+  NegotiationOrderLead
 } from "../controllers/lead_controller.js";
 
 const router = express.Router();
 
 router.post("/create/lead", CreateLead);
+router.post("/create/negotiation", NegotiationOrderLead);
 router.get("/leads", DisplayOrderLeads);
 router.post("/accept/lead/driver", AcceptOrderLead);
 router.post("/accept/lead/customer", AcceptOrderLeadByCustomer);

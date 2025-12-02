@@ -130,6 +130,37 @@ export const AcceptOrderLead = async (req, res) => {
   }
 };
 
+
+
+// Negotiation Lead
+
+export const NegotiationOrderLead = async (req, res) => {
+  try {
+    const { price, id, driverId} = req.body;
+
+    const order = await Lead.findById({ _id: id }, "negotiation");
+
+    await order.negotiation.push({
+      id: driverId,
+      price: price,
+    });
+
+    const data = await Lead.findByIdAndUpdate(
+      { _id: id },
+      { status: "pending", negotiation: order.negotiation }
+    );
+
+    return res
+      .status(200)
+      .json({ msg: "Negotitation Set Successfully", data });
+  } catch (error) {
+    console.log(error);
+    res.status(400).json({ msg: error });
+  }
+};
+
+
+
 export const DisplayCustomerLead = async (req, res) => {
   try {
     const { id } = req.query;
@@ -158,9 +189,11 @@ export const DisplayRides = async (req, res) => {
 
 export const AcceptOrderLeadByCustomer = async (req, res) => {
   try {
-    const { orderId, driverId, customerId, name } = req.body;
+    const { orderId, driverId, customerId, name,selectedPrice } = req.body;
     const lead = await Lead.findOne({ _id: orderId });
-    const driver = lead?.drivers?.find((f) => f?.id === driverId);
+    const driver = lead?.drivers?.find(
+      (f) => f?.id === driverId && f?.price === selectedPrice
+    );
 
     if (!driver)
       return res.status(400).json({ msg: "Driver Not Found or Exist" });
