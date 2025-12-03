@@ -58,27 +58,27 @@ export const CreateLead = async (req, res) => {
       distance: extractKm,
     });
 
-    const customerDetails = await User.findById(
-      { _id: id },
-      "name email phone"
-    );
+    // const customerDetails = await User.findById(
+    //   { _id: id },
+    //   "name email phone"
+    // );
 
-    await sendDevMail(
-      "mrcubandev@gmail.com",
-      "Order Create",
-      CreateOrderDevTemplate(
-        pickup,
-        drop,
-        pickdate,
-        id,
-        type,
-        seat,
-        extractKm,
-        customerDetails?.name,
-        customerDetails?.email,
-        customerDetails?.phone
-      )
-    );
+    // await sendDevMail(
+    //   "mrcubandev@gmail.com",
+    //   "Order Create",
+    //   CreateOrderDevTemplate(
+    //     pickup,
+    //     drop,
+    //     pickdate,
+    //     id,
+    //     type,
+    //     seat,
+    //     extractKm,
+    //     customerDetails?.name,
+    //     customerDetails?.email,
+    //     customerDetails?.phone
+    //   )
+    // );
     return res.status(200).json({ msg: "Lead Generate Successfully", data });
   } catch (error) {
     console.log(error);
