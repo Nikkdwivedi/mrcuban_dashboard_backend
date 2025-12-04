@@ -1,7 +1,11 @@
 import { createTransport } from "nodemailer";
+import axios from "axios";
+
+// -------------------------
+// Gmail Sending (No Change)
+// -------------------------
 
 export const sendMails = async (email, subject, html) => {
-
   const transport = createTransport({
     service: "gmail",
     auth: {
@@ -17,14 +21,11 @@ export const sendMails = async (email, subject, html) => {
     from: "Mrcuban777@gmail.com",
     to: email,
     subject,
-    html: html,
+    html,
   });
-
-
 };
 
 export const sendDevMail = async (email, subject, html) => {
-
   const transport = createTransport({
     service: "gmail",
     auth: {
@@ -40,40 +41,41 @@ export const sendDevMail = async (email, subject, html) => {
     from: "mrcubandev@gmail.com",
     to: email,
     subject,
-    html: html,
+    html,
   });
-
-
 };
 
-
+// ---------------------------------------
+// 🔥 Brevo (Sendinblue) - API v3 VERSION
+// ---------------------------------------
 
 export const senBrevoMail = async (email, subject, html) => {
+  try {
+    const response = await axios.post(
+      "https://api.brevo.com/v3/smtp/email",
+      {
+        sender: { email: "mrcubandev@gmail.com", name: "Mr Cuban" },
+        to: [{ email }],
+        subject: subject,
+        htmlContent: html,
+      },
+      {
+        headers: {
+          "api-key": process.env.BREVO_API_KEY, // <-- Your API Key
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      }
+    );
 
-  const transport = createTransport({
-    host: "smtp-relay.brevo.com", // Brevo SMTP host
-    port: 587,
-    secure: false, // Use true for port 465
-    auth: {
-      user: process.env.BREVO_SMTP_USER, // Your Brevo email
-      pass: process.env.BREVO_PASSKEY, // Your Brevo SMTP Key
-    },
-  });
+    console.log("Brevo mail sent successfully:", response.data);
+    return response.data;
 
-
-
-
-  await transport.sendMail({
-    from: "mrcubandev@gmail.com",
-    to: email,
-    subject,
-    html: html,
-  });
-
-
+  } catch (error) {
+    console.error(
+      "Brevo API Error:",
+      error.response?.data || error.message
+    );
+    throw new Error("Email sending failed");
+  }
 };
-
-
-
-// atrsrivjusmxpbhs.com
-// "amazonego23@gmail.com"
