@@ -113,8 +113,6 @@ export const SendNotification = async (req, res) => {
 
     const driverIds = drivers.map(driver => driver.driverId);
 
-  
-
     // Fetch tokens for all drivers
     const newTokens = await Tokens.find({ partnerId: { $in: driverIds } });
 
@@ -122,38 +120,48 @@ export const SendNotification = async (req, res) => {
       return res.status(200).json({ msg: "No valid tokens found" });
     }
 
-    const messages = [];
+    // Return response immediately and send notifications in background
+    res.status(200).json({
+      msg: "Notifications are being sent",
+      totalTokens: newTokens.length
+    });
 
-    for (let pushToken of newTokens) {
-      if (!pushToken.token || !Expo.isExpoPushToken(pushToken.token)) {
-        console.error(`Invalid push token: ${pushToken?.token}`);
-        continue;
+    // Send notifications asynchronously in the background
+    (async () => {
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let pushToken of newTokens) {
+        if (!pushToken.token || !Expo.isExpoPushToken(pushToken.token)) {
+          console.error(`Invalid push token: ${pushToken?.token}`);
+          failCount++;
+          continue;
+        }
+
+        const notification = {
+          to: pushToken.token,
+          sound: "default",
+          title,
+          body: message,
+          data: { someData: "goes here" },
+        };
+
+        try {
+          const receipt = await expo.sendPushNotificationsAsync([notification]);
+          console.log(`Sent to ${pushToken.token}:`, receipt);
+          successCount++;
+        } catch (error) {
+          console.error(`Error sending to ${pushToken.token}:`, error.message);
+          failCount++;
+          // Continue sending to other tokens even if one fails
+        }
       }
-      messages.push({
-        to: pushToken.token,
-        sound: "default",
-        title,
-        body: message,
-        data: { someData: "goes here" },
-      });
-    }
 
-    if (!messages.length) {
-      return res.status(200).json({ msg: "No valid push tokens to send notifications" });
-    }
+      console.log(`Notifications complete: ${successCount} successful, ${failCount} failed`);
+    })().catch(error => {
+      console.error("Background notification error:", error);
+    });
 
-    // Send notifications in chunks
-    const chunks = expo.chunkPushNotifications(messages);
-    try {
-      for (let chunk of chunks) {
-        const receipts = await expo.sendPushNotificationsAsync(chunk);
-        console.log("Receipts:", receipts);
-      }
-      res.status(200).send("Notifications sent successfully");
-    } catch (error) {
-      console.error("Error sending notifications:", error);
-      res.status(500).json({ msg: "Error sending notifications" });
-    }
   } catch (error) {
     console.error("Error in SendNotification API:", error);
     res.status(400).json({ msg: error.message || "Error processing request" });
@@ -166,37 +174,47 @@ export const SendSingularNotification = async (id, title, message) => {
     let expo = new Expo();
 
     const tokens = await Tokens.find({ partnerId: id }, "token");
-    let messages = [];
 
-    for (let pushToken of tokens) {
-      // Check if the token is a valid Expo push token
-      if (!Expo.isExpoPushToken(pushToken.token)) {
-        console.error(
-          `Push token ${pushToken.token} is not a valid Expo push token`
-        );
-        continue;
-      }
-      messages.push({
-        to: pushToken.token,
-        sound: "default",
-        title: title,
-        body: message,
-        data: { someData: "goes here" },
-      });
+    if (!tokens || tokens.length === 0) {
+      console.log(`No tokens found for driver ${id}`);
+      return "No tokens found";
     }
 
-    // Send notifications in chunks
-    let chunks = expo.chunkPushNotifications(messages);
+    // Send notifications individually in the background to avoid project conflicts
     (async () => {
-      for (let chunk of chunks) {
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let pushToken of tokens) {
+        // Check if the token is a valid Expo push token
+        if (!pushToken.token || !Expo.isExpoPushToken(pushToken.token)) {
+          console.error(`Invalid push token for driver ${id}: ${pushToken?.token}`);
+          failCount++;
+          continue;
+        }
+
+        const notification = {
+          to: pushToken.token,
+          sound: "default",
+          title: title,
+          body: message,
+          data: { someData: "goes here" },
+        };
+
         try {
-          let receipts = await expo.sendPushNotificationsAsync(chunk);
-          console.log(receipts);
+          const receipt = await expo.sendPushNotificationsAsync([notification]);
+          console.log(`Sent to driver ${id} (${pushToken.token}):`, receipt);
+          successCount++;
         } catch (error) {
-          console.error(error);
+          console.error(`Error sending to driver ${id} (${pushToken.token}):`, error.message);
+          failCount++;
         }
       }
-    })();
+
+      console.log(`Driver ${id} notifications: ${successCount} successful, ${failCount} failed`);
+    })().catch(error => {
+      console.error(`Background notification error for driver ${id}:`, error);
+    });
 
     return "Notification Sent";
   } catch (error) {

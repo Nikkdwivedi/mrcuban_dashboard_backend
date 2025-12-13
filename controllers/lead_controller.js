@@ -58,27 +58,27 @@ export const CreateLead = async (req, res) => {
       distance: extractKm,
     });
 
-    // const customerDetails = await User.findById(
-    //   { _id: id },
-    //   "name email phone"
-    // );
+    const customerDetails = await User.findById(
+      { _id: id },
+      "name email phone"
+    );
 
-    // await sendDevMail(
-    //   "mrcubandev@gmail.com",
-    //   "Order Create",
-    //   CreateOrderDevTemplate(
-    //     pickup,
-    //     drop,
-    //     pickdate,
-    //     id,
-    //     type,
-    //     seat,
-    //     extractKm,
-    //     customerDetails?.name,
-    //     customerDetails?.email,
-    //     customerDetails?.phone
-    //   )
-    // );
+    await sendDevMail(
+      "mrcubandev@gmail.com",
+      "Order Create",
+      CreateOrderDevTemplate(
+        pickup,
+        drop,
+        pickdate,
+        id,
+        type,
+        seat,
+        extractKm,
+        customerDetails?.name,
+        customerDetails?.email,
+        customerDetails?.phone
+      )
+    );
     return res.status(200).json({ msg: "Lead Generate Successfully", data });
   } catch (error) {
     console.log(error);
@@ -132,8 +132,7 @@ export const AcceptOrderLead = async (req, res) => {
 
 
 
-// Negotiation Lead
-
+// Negotiation Lead (Driver Specific)
 export const NegotiationOrderLead = async (req, res) => {
   try {
     const { price, id, driverId} = req.body;
@@ -150,6 +149,13 @@ export const NegotiationOrderLead = async (req, res) => {
       { status: "pending", negotiation: order.negotiation }
     );
 
+    // Send notification to the specific driver
+    SendSingularNotification(
+      driverId,
+      "New Negotiation Offer!",
+      `A customer has sent you a negotiation offer of ₹${price}. Check the app to review and respond.`
+    ).catch(error => console.log("Notification error:", error));
+
     return res
       .status(200)
       .json({ msg: "Negotitation Set Successfully", data });
@@ -161,11 +167,118 @@ export const NegotiationOrderLead = async (req, res) => {
 
 
 
+// Negotiation Lead (Global)
+export const NegotiationOrderLeadGlobal = async (req, res) => {
+  try {
+    const { price, id } = req.body;
+
+    // Debug logs
+    console.log("Received negotiation request:", { price, id });
+
+    // Validate input
+    if (!price || !id) {
+      return res.status(400).json({
+        msg: "Price and order ID are required",
+        received: { price, id }
+      });
+    }
+
+    // Validate ObjectId format
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        msg: "Invalid order ID format. Must be a valid MongoDB ObjectId.",
+        received: id
+      });
+    }
+
+    // Find the order/lead
+    const order = await Lead.findById(id);
+
+    if (!order) {
+      return res.status(404).json({
+        msg: "Order not found",
+        searchedId: id
+      });
+    }
+
+    console.log("Found order:", order._id);
+    console.log("Current drivers:", order.drivers?.length);
+    console.log("Current negotiations:", order.negotiation?.length);
+
+    // Check if drivers exist
+    if (!order.drivers || order.drivers.length === 0) {
+      return res.status(400).json({
+        msg: "No drivers available for negotiation"
+      });
+    }
+
+    // Create negotiation entries for each driver
+    const newNegotiations = order.drivers.map(driver => ({
+      id: driver.id,
+      price: price,
+      createdAt: new Date()
+    }));
+
+    console.log("Creating negotiations:", newNegotiations);
+
+    // Add new negotiations to existing array (not replace)
+    const updatedNegotiations = [...(order.negotiation || []), ...newNegotiations];
+
+    // Update the order with new negotiations
+    const updatedOrder = await Lead.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          negotiation: updatedNegotiations,
+          status: "pending"  // Change status to show negotiation is active
+        }
+      },
+      { new: true } // Return updated document
+    );
+
+
+    console.log("Updated order negotiations:", updatedOrder.negotiation?.length);
+
+    // Send notifications to all drivers in the background
+    (async () => {
+      for (let driver of order.drivers) {
+        try {
+          await SendSingularNotification(
+            driver.id,
+            "Global Negotiation Offer!",
+            `A customer has sent a negotiation offer of ₹${price} to all drivers. Check the app to review and respond.`
+          );
+          console.log(`Notification sent to driver ${driver.id}`);
+        } catch (error) {
+          console.error(`Failed to send notification to driver ${driver.id}:`, error);
+        }
+      }
+      console.log(`Global negotiation notifications sent to ${order.drivers.length} drivers`);
+    })().catch(error => {
+      console.error("Background notification error:", error);
+    });
+
+    return res.status(200).json({
+      msg: "Negotiation set successfully for all drivers",
+      data: updatedOrder,
+      negotiationsAdded: newNegotiations.length
+    });
+
+  } catch (error) {
+    console.log("Negotiation error:", error);
+    return res.status(500).json({
+      msg: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
+
 export const DisplayCustomerLead = async (req, res) => {
   try {
     const { id } = req.query;
 
-    const data = await Lead.findOne({ customer_id: id });
+    const data = await Lead.findOne({ customer_id: id }).sort({ createdAt: -1 });;
 
     return res.status(200).json({ msg: "Lead Get Successfully", data });
   } catch (error) {
