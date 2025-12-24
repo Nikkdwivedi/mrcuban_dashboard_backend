@@ -5,6 +5,8 @@ import morgan from "morgan";
 import cloudinary from "cloudinary";
 import fileUpload from "express-fileupload";
 import bodyParser from "body-parser";
+import { createServer } from "http";
+import { Server } from "socket.io";
 import { Database } from "./config/Database.js";
 import UserRoutes from "./routes/user_routes.js";
 import DistanceRoutes from "./routes/distance_route.js";
@@ -19,6 +21,8 @@ import VicheleRoutes from "./routes/vichele_routes.js"
 import SyrexRoutes from "./routes/syrex.js"
 import GetTrRatio from "./routes/tr_ratio_routes.js";
 import AppVersionRoutes from "./routes/app_version_route.js"
+import CallRoutes from "./routes/call_routes.js";
+import { setupSocketIO } from "./socket/socketHandler.js";
 
 
 config({path:"./config/.env"});
@@ -57,13 +61,29 @@ app.use("/api/v1",VicheleRoutes);
 app.use("/api/v1",SyrexRoutes);
 app.use("/api/v1",GetTrRatio);
 app.use("/api/v1",AppVersionRoutes);
+app.use("/api/v1",CallRoutes);
 
 app.get("/",(req,res)=>{
    res.status(200).json({msg:"ok"})
 })
 
+// Create HTTP server and setup Socket.IO
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  },
+  transports: ['websocket', 'polling']
+});
 
+// Setup Socket.IO handlers
+setupSocketIO(io);
 
-app.listen(process.env.PORT,()=>{
-    console.log(`Server is runnin on PORT no ${process.env.PORT}`)
+// Make io accessible to routes
+app.set('io', io);
+
+httpServer.listen(process.env.PORT,()=>{
+    console.log(`Server is running on PORT no ${process.env.PORT}`)
+    console.log(`Socket.IO server is ready`)
 })
