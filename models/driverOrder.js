@@ -18,7 +18,9 @@ const orderSchema = new mongoose.Schema(
     otp:String,
     carDetails:Object,
     seater:Number,
-    km:Number
+    km:Number,
+    isOffer: { type: Boolean, default: false },
+    offerId: { type: mongoose.Schema.Types.ObjectId, ref: "Offer" }
   },
   { timestamps: true }
 );

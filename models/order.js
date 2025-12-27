@@ -17,8 +17,9 @@ const orderSchema = new mongoose.Schema(
     driver:[],
     driverOrderId:String,
     seater:Number,
-    km:Number
-    
+    km:Number,
+    isOffer: { type: Boolean, default: false },
+    offerId: { type: mongoose.Schema.Types.ObjectId, ref: "Offer" }
   },
   { timestamps: true }
 );
