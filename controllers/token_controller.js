@@ -5,16 +5,21 @@ import { Rides } from "../models/rides.js";
 // Save Token Function
 export const SavedToken = async (req, res) => {
   try {
-    const { id, token } = req.query;
+    const { id, token, appType } = req.query;
 
     const check = await Tokens.findOne({
       $and: [{ partnerId: id }, { token: token }],
     });
 
     if (check) {
+      // Update appType if it's different or missing
+      if (check.appType !== appType) {
+        check.appType = appType;
+        await check.save();
+      }
       return res.status(200).json({ msg: "ok", data: check });
     } else {
-      const data = await Tokens.create({ partnerId: id, token: token });
+      const data = await Tokens.create({ partnerId: id, token: token, appType: appType || "customer" });
       return res.status(200).json({ msg: "ok", data });
     }
   } catch (error) {
@@ -169,14 +174,30 @@ export const SendNotification = async (req, res) => {
 };
 
 
-export const SendSingularNotification = async (id, title, message) => {
+export const SendSingularNotification = async (id, title, message, appType = null) => {
   try {
     let expo = new Expo();
 
-    const tokens = await Tokens.find({ partnerId: id }, "token");
+    // Build query to find tokens
+    let query = { partnerId: id };
+    if (appType === "customer") {
+      // Include tokens without appType for backward compatibility with customer tokens
+      query = {
+        partnerId: id,
+        $or: [
+          { appType: "customer" },
+          { appType: { $exists: false } },
+          { appType: null }
+        ]
+      };
+    } else if (appType) {
+      query.appType = appType;
+    }
+
+    const tokens = await Tokens.find(query, "token");
 
     if (!tokens || tokens.length === 0) {
-      console.log(`No tokens found for driver ${id}`);
+      console.log(`No tokens found for user ${id}${appType ? ` with appType ${appType}` : ''}`);
       return "No tokens found";
     }
 

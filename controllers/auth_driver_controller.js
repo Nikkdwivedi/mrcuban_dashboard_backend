@@ -144,11 +144,21 @@ export const UploadDocs = async (req, res) => {
 
 export const Driver_Login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, phone } = req.body;
 
-    const existuser = await Driver.findOne({
-      email: email.toLowerCase(),
-    });
+    if (!email && !phone) {
+      return res.status(400).json({ msg: "Email or phone is required" });
+    }
+
+    const query = {};
+
+    if (email) {
+      query.email = email.toLowerCase();
+    } else if (phone) {
+      query.phone = phone;
+    }
+
+    const existuser = await Driver.findOne(query);
 
     if (!existuser) return res.status(400).json({ msg: "Invalid Credintials" });
 

@@ -20,6 +20,7 @@ import SyrexRoutes from "./routes/syrex.js"
 import GetTrRatio from "./routes/tr_ratio_routes.js";
 import AppVersionRoutes from "./routes/app_version_route.js"
 import OfferRoutes from "./routes/offer_routes.js";
+import AgoraRoutes from "./routes/agora_routes.js";
 
 
 config({path:"./config/.env"});
@@ -59,6 +60,7 @@ app.use("/api/v1",SyrexRoutes);
 app.use("/api/v1",GetTrRatio);
 app.use("/api/v1",AppVersionRoutes);
 app.use("/api/v1",OfferRoutes);
+app.use("/api/v1",AgoraRoutes);
 
 app.get("/",(req,res)=>{
    res.status(200).json({msg:"ok"})

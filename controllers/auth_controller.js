@@ -106,16 +106,23 @@ export const Verify_Account = async (req, res) => {
 
 export const User_Login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, phone } = req.body;
 
-    const existuser = await User.findOne({
-      $and: [
-        {
-          email: email.toLowerCase(),
-        },
-        { verify: true },
-      ],
-    });
+    if (!email && !phone) {
+      return res.status(400).json({ msg: "Email or phone is required" });
+    }
+
+    const query = {
+      verify: true
+    };
+
+    if (email) {
+      query.email = email.toLowerCase();
+    } else if (phone) {
+      query.phone = phone;
+    }
+
+    const existuser = await User.findOne(query);
 
     if (!existuser) return res.status(400).json({ msg: "Invalid Credintials" });
 

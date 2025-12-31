@@ -52,17 +52,58 @@ export const createOffer = async (req, res) => {
       seat: driver.seat || 4,
     });
 
-    // Send notifications to all customers (async, don't block response)
+    // Send notifications to all customers who have tokens (async, don't block response)
     (async () => {
       try {
-        const allCustomers = await User.find({}, "_id");
-        for (let customer of allCustomers) {
-          await SendSingularNotification(
-            customer._id,
-            "New Offer Available!",
-            `A driver has posted a new ${tripType} offer for ₹${amount}. Check the Offers tab!`
-          );
+        console.log("Starting to send offer notifications...");
+
+        // Get all tokens that are either customer app tokens or don't have appType set (backward compatibility)
+        // But exclude driver app tokens
+        const customerTokens = await Tokens.find({
+          $or: [
+            { appType: "customer" },
+            { appType: { $exists: false } },
+            { appType: null }
+          ]
+        }, "partnerId").distinct("partnerId");
+        console.log(`Found ${customerTokens.length} potential customer token partner IDs`);
+
+        // Verify these are actual customers in the User collection (not drivers)
+        const customers = await User.find(
+          { _id: { $in: customerTokens } },
+          "_id"
+        );
+
+        const customerIds = customers.map(customer => customer._id.toString());
+        console.log(`Verified ${customerIds.length} customers from User collection`);
+        console.log(`Customer IDs: ${customerIds.join(', ')}`);
+
+        if (customerIds.length === 0) {
+          console.log("No customers with tokens found. Skipping notifications.");
+          return;
         }
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let customerId of customerIds) {
+          try {
+            console.log(`Sending notification to customer ${customerId}...`);
+            const result = await SendSingularNotification(
+              customerId,
+              "New Offer Available!",
+              `A driver has posted a new ${tripType} offer for ₹${amount}. Check the Offers tab!`,
+              "customer" // Only send to customer app tokens
+            );
+            console.log(`Notification result for ${customerId}:`, result);
+            successCount++;
+          } catch (err) {
+            failCount++;
+            console.error(`Failed to send notification to customer ${customerId}:`, err.message);
+          }
+        }
+
+        console.log(`Offer notifications sent: ${successCount} successful, ${failCount} failed`);
       } catch (error) {
         console.error("Error sending offer notifications:", error);
       }
@@ -271,7 +312,7 @@ export const acceptOffer = async (req, res) => {
     await SendSingularNotification(
       driver._id,
       "Offer Accepted!",
-      `${customer.name} has accepted your offer for ₹${offer.amount}. OTP: ${otp}`
+      `${customer.name} has accepted your offer for ₹${offer.amount}`
     );
 
     // Send notification to customer
@@ -525,5 +566,40 @@ export const finishOfferRide = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, msg: error.message });
+  }
+};
+
+// Cancel unaccepted offer (Driver)
+export const cancelUnacceptedOffer = async (req, res) => {
+  try {
+    const { offerId } = req.query;
+
+    const offer = await Offer.findById(offerId);
+
+    if (!offer) {
+      return res.status(404).json({ success: false, msg: "Offer not found" });
+    }
+
+    // Only allow cancellation if offer is not accepted
+    if (offer.status === "accepted") {
+      return res.status(400).json({
+        success: false,
+        msg: "Cannot cancel accepted offer. Customer has already accepted this offer."
+      });
+    }
+
+    // Update offer status to cancelled
+    await Offer.findByIdAndUpdate(
+      offerId,
+      { status: "cancelled" }
+    );
+
+    return res.status(200).json({
+      success: true,
+      msg: "Offer cancelled successfully"
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, msg: error.message });
   }
 };

@@ -9,6 +9,7 @@ import {
   cancelOfferRide,
   startOfferRide,
   finishOfferRide,
+  cancelUnacceptedOffer,
 } from "../controllers/offer_controller.js";
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.get("/driver-offers", getDriverOffers);
 router.put("/update-offer-status", updateOfferStatus);
 router.get("/start-offer-ride", startOfferRide);
 router.get("/finish-offer-ride", finishOfferRide);
+router.get("/cancel-unaccepted-offer", cancelUnacceptedOffer);
 
 // Customer routes
 router.get("/active-offers", getActiveOffers);
