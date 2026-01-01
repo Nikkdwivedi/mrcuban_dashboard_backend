@@ -104,7 +104,7 @@ export const AcceptOrderLead = async (req, res) => {
     const { price, id, driverId, driverName, model, rating, orders, phone } =
       req.body;
 
-    const order = await Lead.findById({ _id: id }, "drivers");
+    const order = await Lead.findById({ _id: id }, "drivers customer_id");
 
     await order.drivers.push({
       id: driverId,
@@ -121,6 +121,16 @@ export const AcceptOrderLead = async (req, res) => {
       { status: "pending", drivers: order.drivers }
     );
 
+    // Send notification to customer
+    if (order.customer_id) {
+      SendSingularNotification(
+        order.customer_id,
+        "New Offer Received!",
+        `${driverName} has sent you an offer of ₹${price}. Check the app to review.`,
+        "customer"
+      ).catch(error => console.log("Notification error:", error));
+    }
+
     return res
       .status(200)
       .json({ msg: "Order Accept by driver  Successfully", data });
@@ -133,11 +143,12 @@ export const AcceptOrderLead = async (req, res) => {
 
 
 // Negotiation Lead (Driver Specific)
+// This is called when CUSTOMER sends negotiation to DRIVER
 export const NegotiationOrderLead = async (req, res) => {
   try {
-    const { price, id, driverId} = req.body;
+    const { price, id, driverId } = req.body;
 
-    const order = await Lead.findById({ _id: id }, "negotiation");
+    const order = await Lead.findById({ _id: id }, "negotiation customer_id");
 
     await order.negotiation.push({
       id: driverId,
@@ -149,12 +160,15 @@ export const NegotiationOrderLead = async (req, res) => {
       { status: "pending", negotiation: order.negotiation }
     );
 
-    // Send notification to the specific driver
-    SendSingularNotification(
-      driverId,
-      "New Negotiation Offer!",
-      `A customer has sent you a negotiation offer of ₹${price}. Check the app to review and respond.`
-    ).catch(error => console.log("Notification error:", error));
+    // Send notification to the DRIVER (customer is sending negotiation to driver)
+    if (driverId) {
+      SendSingularNotification(
+        driverId,
+        "New Negotiation Offer!",
+        `A customer has sent you a negotiation offer of ₹${price}. Check the app to review.`,
+        "driver"
+      ).catch(error => console.log("Notification error:", error));
+    }
 
     return res
       .status(200)

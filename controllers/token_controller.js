@@ -174,7 +174,7 @@ export const SendNotification = async (req, res) => {
 };
 
 
-export const SendSingularNotification = async (id, title, message, appType = null) => {
+export const SendSingularNotification = async (id, title, message, appType = null, data = {}) => {
   try {
     let expo = new Expo();
 
@@ -194,10 +194,14 @@ export const SendSingularNotification = async (id, title, message, appType = nul
       query.appType = appType;
     }
 
+    console.log(`[NOTIFICATION] Searching for tokens - User: ${id}, AppType: ${appType}, Query:`, JSON.stringify(query));
+
     const tokens = await Tokens.find(query, "token");
 
+    console.log(`[NOTIFICATION] Found ${tokens?.length || 0} tokens for user ${id} with appType ${appType}`);
+
     if (!tokens || tokens.length === 0) {
-      console.log(`No tokens found for user ${id}${appType ? ` with appType ${appType}` : ''}`);
+      console.log(`[NOTIFICATION] No tokens found for user ${id}${appType ? ` with appType ${appType}` : ''}`);
       return "No tokens found";
     }
 
@@ -219,7 +223,9 @@ export const SendSingularNotification = async (id, title, message, appType = nul
           sound: "default",
           title: title,
           body: message,
-          data: { someData: "goes here" },
+          data: data, // Use the provided data
+          priority: "high",
+          channelId: "default",
         };
 
         try {

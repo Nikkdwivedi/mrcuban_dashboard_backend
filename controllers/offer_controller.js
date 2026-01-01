@@ -142,9 +142,10 @@ export const getDriverOffers = async (req, res) => {
         const offerObj = offer.toObject();
 
         if (offer.driverOrderId) {
-          const driverOrder = await DriverOrder.findById(offer.driverOrderId, "otp");
+          const driverOrder = await DriverOrder.findById(offer.driverOrderId, "otp customerId");
           if (driverOrder) {
             offerObj.otp = driverOrder.otp;
+            offerObj.customerId = driverOrder.customerId; // Add customer ID for calling
           }
         }
 

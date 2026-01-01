@@ -81,9 +81,18 @@ export const generateAgoraToken = async (req, res) => {
  */
 export const sendCallNotification = async (req, res) => {
   try {
-    const { receiverId, callerName, channelName, isDriver } = req.body;
+    const { receiverId, callerName, channelName, isDriver, callerId } = req.body;
+
+    console.log(`[CALL NOTIFICATION] Received request:`, {
+      receiverId,
+      callerName,
+      channelName,
+      isDriver,
+      callerId,
+    });
 
     if (!receiverId || !callerName || !channelName) {
+      console.log(`[CALL NOTIFICATION] Missing required fields`);
       return res.status(400).json({
         success: false,
         msg: "Missing required fields",
@@ -94,13 +103,25 @@ export const sendCallNotification = async (req, res) => {
     const notificationTitle = `Incoming Call`;
     const notificationBody = `${callerName} is calling you...`;
 
-    await SendSingularNotification(
+    // Determine appType based on isDriver flag
+    // If caller is driver, send to customer app. If caller is customer, send to driver app
+    const targetAppType = isDriver ? "customer" : "driver";
+
+    console.log(`[CALL NOTIFICATION] Sending to ${receiverId} (${targetAppType} app) from ${callerName} for channel: ${channelName}`);
+
+    const result = await SendSingularNotification(
       receiverId,
       notificationTitle,
-      notificationBody
+      notificationBody,
+      targetAppType,
+      {
+        channelName,
+        type: "incoming_call",
+        callerId: callerId // Include caller ID so receiver can send rejection
+      }
     );
 
-    console.log(`Call notification sent to ${receiverId} from ${callerName} for channel: ${channelName}`);
+    console.log(`[CALL NOTIFICATION] Result: ${result}`);
 
     res.status(200).json({
       success: true,
@@ -111,10 +132,67 @@ export const sendCallNotification = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error sending call notification:", error);
+    console.error("[CALL NOTIFICATION] Error:", error);
     res.status(500).json({
       success: false,
       msg: "Failed to send call notification",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Send call rejection notification to the caller
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const sendCallRejection = async (req, res) => {
+  try {
+    const { callerId, rejectorName, channelName, isDriver } = req.body;
+
+    console.log(`[CALL REJECTION] Received request:`, {
+      callerId,
+      rejectorName,
+      channelName,
+      isDriver,
+    });
+
+    if (!callerId || !channelName) {
+      console.log(`[CALL REJECTION] Missing required fields`);
+      return res.status(400).json({
+        success: false,
+        msg: "Missing required fields",
+      });
+    }
+
+    // Determine appType based on isDriver flag
+    // If rejector is driver, send to customer app. If rejector is customer, send to driver app
+    const targetAppType = isDriver ? "customer" : "driver";
+
+    console.log(`[CALL REJECTION] Sending rejection to ${callerId} (${targetAppType} app) for channel: ${channelName}`);
+
+    const result = await SendSingularNotification(
+      callerId,
+      "Call Declined",
+      `${rejectorName || "User"} declined your call`,
+      targetAppType,
+      { channelName, type: "call_rejected" } // Pass channel name and rejection type
+    );
+
+    console.log(`[CALL REJECTION] Result: ${result}`);
+
+    res.status(200).json({
+      success: true,
+      msg: "Call rejection sent successfully",
+      data: {
+        channelName,
+      },
+    });
+  } catch (error) {
+    console.error("[CALL REJECTION] Error:", error);
+    res.status(500).json({
+      success: false,
+      msg: "Failed to send call rejection",
       error: error.message,
     });
   }
